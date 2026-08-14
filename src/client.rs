@@ -1682,8 +1682,13 @@ impl ClientBuilder {
     /// This will overwrite the existing configuration.
     /// You must set emulation before you can perform subsequent HTTP1/HTTP2/TLS fine-tuning.
     #[inline]
-    pub fn emulation<T: IntoEmulation>(self, emulation: T) -> ClientBuilder {
-        let emulation = emulation.into_emulation();
+    pub fn emulation<T: IntoEmulation>(mut self, emulation: T) -> ClientBuilder {
+        let mut emulation = emulation.into_emulation();
+        if let Some(error) = emulation.error.take() {
+            self.config.error = Some(Error::builder(error));
+            return self;
+        }
+
         self.tls_options(emulation.tls_options)
             .http1_options(emulation.http1_options)
             .http2_options(emulation.http2_options)

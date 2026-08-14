@@ -1,3 +1,5 @@
+use std::{error::Error as StdError, fmt};
+
 use http::HeaderMap;
 use wreq_proto::{http1::Http1Options, http2::Http2Options};
 
@@ -15,6 +17,45 @@ pub trait IntoEmulation {
     fn into_emulation(self) -> Emulation;
 }
 
+/// A profile emulation configuration rejected before network I/O.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmulationError {
+    profile: &'static str,
+    platform: &'static str,
+}
+
+impl EmulationError {
+    /// Creates an unsupported-platform error for a canonical profile.
+    #[inline]
+    pub const fn unsupported_platform(profile: &'static str, platform: &'static str) -> Self {
+        Self { profile, platform }
+    }
+
+    /// Returns the canonical profile name.
+    #[inline]
+    pub const fn profile(&self) -> &'static str {
+        self.profile
+    }
+
+    /// Returns the rejected platform name.
+    #[inline]
+    pub const fn platform(&self) -> &'static str {
+        self.platform
+    }
+}
+
+impl fmt::Display for EmulationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "platform '{}' is not supported by emulation profile '{}'",
+            self.platform, self.profile
+        )
+    }
+}
+
+impl StdError for EmulationError {}
+
 /// Builder for creating an [`Emulation`] configuration.
 #[must_use]
 #[derive(Debug)]
@@ -29,6 +70,8 @@ pub struct EmulationBuilder {
 #[derive(Debug, Clone)]
 pub struct Emulation {
     pub(crate) group: Group,
+
+    pub(crate) error: Option<EmulationError>,
 
     /// Default headers applied to outgoing requests.
     pub headers: HeaderMap,
@@ -101,6 +144,7 @@ impl Emulation {
         EmulationBuilder {
             emulation: Emulation {
                 group: Group::default(),
+                error: None,
                 headers: HeaderMap::new(),
                 orig_headers: OrigHeaderMap::new(),
                 tls_options: None,
@@ -108,6 +152,14 @@ impl Emulation {
                 http2_options: None,
             },
         }
+    }
+
+    /// Attaches a deferred validation error for fallible request builders.
+    #[doc(hidden)]
+    #[inline]
+    pub fn with_error(mut self, error: EmulationError) -> Self {
+        self.error = Some(error);
+        self
     }
 }
 

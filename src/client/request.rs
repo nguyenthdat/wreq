@@ -22,22 +22,21 @@ use {super::multipart, bytes::Bytes, http::header::CONTENT_LENGTH};
 ))]
 use super::layer::decoder::AcceptEncoding;
 use super::{
-    Body, Client, IntoEmulation, Response,
     future::Pending,
     layer::{
         config::{DefaultHeaders, RequestOptions},
         timeout::TimeoutOptions,
     },
+    Body, Client, IntoEmulation, Response,
 };
 #[cfg(feature = "cookies")]
 use crate::cookie::{CookieStore, IntoCookieStore};
 use crate::{
-    Error, Method, Proxy,
     config::{RequestConfig, RequestConfigValue},
     ext::UriExt,
     group::Group,
-    header::{AUTHORIZATION, HeaderMap, HeaderName, HeaderValue, OrigHeaderMap},
-    redirect,
+    header::{HeaderMap, HeaderName, HeaderValue, OrigHeaderMap, AUTHORIZATION},
+    redirect, Error, Method, Proxy,
 };
 
 /// A request which can be executed with [`Client::execute()`].
@@ -763,8 +762,17 @@ impl RequestBuilder {
     /// This will overwrite the existing configuration.
     /// You must set emulation before you can perform subsequent HTTP1/HTTP2/TLS fine-tuning.
     pub fn emulation<T: IntoEmulation>(mut self, emulation: T) -> RequestBuilder {
+        if self.request.is_err() {
+            return self;
+        }
+
+        let mut emulation = emulation.into_emulation();
+        if let Some(error) = emulation.error.take() {
+            self.request = Err(crate::Error::builder(error));
+            return self;
+        }
+
         if let Ok(ref mut req) = self.request {
-            let emulation = emulation.into_emulation();
             let opts = req.config_mut::<RequestOptions>().get_or_insert_default();
             opts.group.emulate(emulation.group);
             opts.tls_options = emulation.tls_options;

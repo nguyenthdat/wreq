@@ -329,7 +329,7 @@ pub use self::{
     client::{
         Client, ClientBuilder,
         body::Body,
-        emulate::{Emulation, EmulationBuilder, IntoEmulation},
+        emulate::{Emulation, EmulationBuilder, EmulationError, IntoEmulation},
         request::{Request, RequestBuilder},
         response::Response,
         upgrade::Upgraded,
